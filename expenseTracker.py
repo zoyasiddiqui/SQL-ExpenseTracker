@@ -2,7 +2,7 @@ import sqlite3
 from datetime import date
 
 def create_connection(file):
-    """create a database connection to file"""
+    """Create a database connection to file"""
 
     connection = None
     try:
@@ -12,12 +12,11 @@ def create_connection(file):
     return connection
 
 def create_table(connection):
-    """create a table"""
+    """Create a table called name"""
 
     try:
         cur = connection.cursor()
-        # NOT NULL ensures that a column cannot have a null value
-        cur.execute("""
+        sql = """
         CREATE TABLE IF NOT EXISTS Expenses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             category TEXT NOT NULL,
@@ -25,19 +24,24 @@ def create_table(connection):
             date TEXT NOT NULL,
             description TEXT
         );
-        """)
+        """
+        cur.execute(sql)
     except Exception as e:
         print(e)
 
 def add_expense(connection, category, amount, description):
-    """add a new expense to the expense table"""
+    """Add a new expense to the expense table"""
 
-    sql = ''' INSERT INTO Expenses(category, amount, date, description)
-              VALUES(?,?,?,?) '''
-    cur = connection.cursor()
-    cur.execute(sql, (category, amount, date.today(), description))
-    connection.commit()
-    return cur.lastrowid
+    try:
+        sql = ''' INSERT INTO Expenses(category, amount, date, description)
+                VALUES(?,?,?,?) '''
+        cur = connection.cursor()
+        cur.execute(sql, (category, amount, date.today(), description))
+        connection.commit()
+        return cur.lastrowid
+    except Exception as e:
+        print(e)
+        return None
 
 def print_results(connection):
     """print all of the entries in the Expenses table"""
@@ -79,7 +83,33 @@ def update_categories(connection):
     
     return categories
 
+def print_category_summary(connection):
+    """Prints a summary of expenses grouped by category with total spent, average spending, and transaction count."""
+    try:
+        sql = '''
+        SELECT
+            category,
+            SUM(amount) AS Total_Spent,
+            AVG(amount) AS Average_Spending,
+            COUNT(id) AS Number_of_Transactions
+        FROM
+            Expenses
+        GROUP BY
+            category
+        ORDER BY
+            Total_Spent DESC;
+        '''
+        cur = connection.cursor()
+        cur.execute(sql)
+        rows = cur.fetchall()
+        print("Category Summary:")
+        for row in rows:
+            print(f"Category: {row[0]}, Total Spent: ${row[1]:.2f}, Average Spending: ${row[2]:.2f}, Transactions: {row[3]}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
 if __name__ == "__main__":
+
     database = "ExpenseTracker.db"
     cat_list = []
 
@@ -90,25 +120,38 @@ if __name__ == "__main__":
         cat_list = update_categories(conn)
 
     #input handling
-    while True:
-        isDone = input("Are you done? Y/N ... ")
-        if isDone == "Y":
-            break
+    options = """Would you like to...
+    See table : A
+    Add new entry : B
+    Delete entry : C
+    See your stats : D
+    Exit : E"""
 
-        enterOrDelete = input("Would you like to enter or delete an entry? E/D ... ")
-        if enterOrDelete == "E":
+    while True:
+        print(options)
+        choice = input("Enter your choice: ")
+
+        if not choice:
+            print("Not valid input. Try again.")
+            pass
+        
+        elif choice == "A":
+            print_results(conn)
+
+        elif choice == "B":
             print("Enter an expense.")
             category = input("Category: ")
             amount = float(input("Amount: "))
             description = input("Description: ")
+
             if not category or not amount or not description or type(amount) is not float:
                 print("Error processing entry. Invalid input.")
                 pass
             else:
                 add_expense(conn, category, amount, description)
-                cat_list = update_categories(conn)
+                cat_list = update_categories(conn) # updating list of all categories
 
-        elif enterOrDelete == "D":
+        elif choice == "C":
             category = input("What category would you like to delete from? ")
             if not category or category not in cat_list:
                 print("Invalid category.")
@@ -123,11 +166,11 @@ if __name__ == "__main__":
                 else:
                     delete_by_id(conn, to_delete)
 
-        else:
-            print("Invalid input.")
-            pass
-
-    print("Your Expenses Currently: ")
-    print_results(conn)
+        elif choice == "D":
+            print_category_summary(conn)
+        
+        elif choice == "E":
+            print("Happy tracking!")
+            break
     
         
